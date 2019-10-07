@@ -1,0 +1,133 @@
+# TP1 : Back to basics
+
+
+## I. Gather informations
+
+* Liste des cartes réseaux
+   * enp0s8 `192.168.56.110/24`
+   * enp0s9 `192.168.55.100/24` 
+
+```
+[root@localhost ~]# ip
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:6d:c1:2b brd ff:ff:ff:ff:ff:ff
+    inet 192.168.56.110/24 brd 192.168.56.255 scope global noprefixroute enp0s8 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::a00:27ff:fe6d:c12b/64 scope link 
+       valid_lft forever preferred_lft forever
+4: enp0s9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 08:00:27:07:fb:88 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.55.100/24 brd 192.168.55.255 scope global noprefixroute enp0s9 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::a00:27ff:fe07:fb88/64 scope link
+       valid_lft forever preferred_lft forever
+```
+
+* Affichage la table de routage de la machine et sa table ARP
+
+```
+10.0.2.0/24 dev enp0s3 proto kernel scope link src 10.0.2.15 metric 100
+192.168.248.0/24 dev enp0s8 proto kernel scope link src 192.168.248.5 metric 101
+```
+
+* Liste des ports en écoute sur la localhost
+
+```
+[root@localhost ~]# ss -ltupn
+Netid State   Recv-Q   Send-Q         Local Address:Port     Peer Address:Port  
+
+udp   UNCONN  0        0           10.0.2.15%enp0s3:68            0.0.0.0:*     
+ users:(("NetworkManager",pid=792,fd=19))
+tcp   LISTEN  0        128                  0.0.0.0:2222          0.0.0.0:*     
+ users:(("sshd",pid=805,fd=6))
+tcp   LISTEN  0        128                        *:9090                *:*     
+ users:(("systemd",pid=1,fd=46))
+tcp   LISTEN  0        128                     [::]:2222             [::]:*     
+ users:(("sshd",pid=805,fd=8))
+```
+
+* Liste des DNS utilisés par localhost
+
+```
+[root@localhost ~]# ping www.reddit.com
+PING reddit.map.fastly.net (151.101.121.140) 56(84) bytes of data.
+64 bytes from 151.101.121.140 (151.101.121.140): icmp_seq=1 ttl=57 time=53.4 ms
+64 bytes from 151.101.121.140 (151.101.121.140): icmp_seq=2 ttl=57 time=271 ms
+64 bytes from 151.101.121.140 (151.101.121.140): icmp_seq=3 ttl=57 time=283 ms
+^C
+--- reddit.map.fastly.net ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 4ms
+rtt min/avg/max/mdev = 53.355/202.749/283.446/105.752 ms
+```
+
+* L'état actuel du firewall (avant modification des ports)
+
+```
+[root@localhost ~]# firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3 enp0s8
+  sources: 
+  services: cockpit dhcpv6-client ssh
+  ports: 22/tcp
+  protocols: 
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+  ```
+
+# II. Edit configuration**
+
+## 1. Configuration cartes réseau**
+
+Ici, on doit en principe créer un fichier enp0s8 à partir du enp0s3 et enfin créer enp0s9. 
+On copie-colle et on modifie le fichier, se trouvant `/etc/sysconfig/network-scripts/ifcfg-enp0s8`:
+```
+TYPE="Ethernet"
+BOOTPROTO="none"
+NAME="enp0s8"
+DEVICE="enp0s8"
+ONBOOT="yes"
+IPADDR=192.168.56.110
+NETMASK=255.255.255.0
+```
+
+* Pour les adresses ip, c'est tout en haut ! Et voici la table ARP :
+
+```
+[root@localhost ~]# arp
+Address                  HWtype  HWaddress           Flags Mask            Iface_gateway                 ether   52:54:00:12:35:02   C                     enp0s3
+192.168.56.1             ether   0a:00:27:00:00:06   C                     enp0s8
+```
+
+## 2. Serveur SSH
+
+* La modification du port 22/tcp au port 2222/tcp
+   * `firewall-cmd --permanent --add-port=2222/tcp`
+   * `firewall-cmd --reload`
+
+```
+[root@localhost ~]# firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3 enp0s8 enp0s9
+  sources:
+  services: cockpit dhcpv6-client ssh
+  ports: 2222/tcp
+  protocols:
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+  ```
+
+Wireshark nous montre les trames de connexions et on peut y appercevoir les échanges au moment de mon ping entre les localhost (enp0s8 et enp0s9) et le clonehost
+
+![wireshark](./wireshark.PNG)
+
+
