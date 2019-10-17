@@ -1,1 +1,269 @@
+TP2 : Network low-level, Switching
+ip host-only ---> identique à gns3 vm >>> dans pref/server iou ==> GNS3 VM
 
+I. Simplest setup
+Topologie
+
++-----+        +-------+        +-----+
+| PC1 +--------+  SW1  +--------+ PC2 |
++-----+        +-------+        +-----+
+ToDo
+
+Voici le show ip all du PC1 :
+PC1> show ip all
+NAME   IP/MASK              GATEWAY           MAC                   DNS
+PC1    10.2.1.1/24          0.0.0.0           00:50:79:66:68:00
+
+PC1> ping 10.2.1.2
+84 bytes from 10.2.1.2 icmp_seq=1 ttl=64 time=0.598 ms
+84 bytes from 10.2.1.2 icmp_seq=2 ttl=64 time=0.475 ms
+84 bytes from 10.2.1.2 icmp_seq=3 ttl=64 time=0.556 ms
+Et de PC2 :
+PC2> show ip all
+NAME   IP/MASK              GATEWAY           MAC                   DNS
+PC2    10.2.1.2/24          0.0.0.0           00:50:79:66:68:01
+
+PC2> ping 10.2.1.1
+84 bytes from 10.2.1.1 icmp_seq=1 ttl=64 time=0.405 ms
+84 bytes from 10.2.1.1 icmp_seq=2 ttl=64 time=0.511 ms
+Corrélation entre Wireshark et la table ARP des machines.
+
+Table ARP
+PC1> arp
+00:50:79:66:68:01  10.2.1.2 expires in 106 seconds
+
+PC2> arp
+00:50:79:66:68:00  10.2.1.1 expires in 101 seconds
+Wireshark wireshark pc1 à pc2 La première ligne est l'envoi du PC1 au PC2, c'est l'ARP request où il demande si quelqu'un connaît l'ip 10.2.1.2 Et le deuxième ligne est la réponse du PC2, ARP reply. De gauche à droite, nous avons l'ip de l'émetteur et l'ip du destinataire à droite et la procédure utilisée, ici c'est un ping.
+Explication
+
+II. More switches
+Topologie
+
+                        +-----+
+                        | PC2 |
+                        +--+--+
+                           |
+                           |
+                       +---+---+
+                   +---+  SW2  +----+
+                   |   +-------+    |
+                   |                |
+                   |                |
++-----+        +---+---+        +---+---+        +-----+
+| PC1 +--------+  SW1  +--------+  SW3  +--------+ PC3 |
++-----+        +-------+        +-------+        +-----+
+Voici les IP des machines, elles se peuvent ping entre elles :
+PC1> show ip                                    PC2> show ip                                    PC3> show ip
+
+NAME        : PC1[1]                            NAME        : PC2[1]                            NAME        : PC3[1]
+IP/MASK     : 10.2.2.1/24                       IP/MASK     : 10.2.2.2/24                       IP/MASK     : 10.2.2.3/24
+
+PC1> ping 10.2.2.2
+84 bytes from 10.2.2.2 icmp_seq=1 ttl=64 time=0.754 ms
+84 bytes from 10.2.2.2 icmp_seq=2 ttl=64 time=0.809 ms
+En rentrant la commande show mac address-table dans le switch IOU1.
+
+La commande nous permet de savoir quel port connaît le switch IOU1 via les pings envoyé des PC1 à PC3.
+IOU1#show mac address-table
+        Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+1    0050.7966.6800    DYNAMIC     Et1/0
+1    0050.7966.6801    DYNAMIC     Et0/0
+1    0050.7966.6802    DYNAMIC     Et0/1
+1    aabb.cc00.0200    DYNAMIC     Et0/0
+1    aabb.cc00.0310    DYNAMIC     Et0/1
+1    aabb.cc00.0320    DYNAMIC     Et0/0
+Total Mac Addresses for this criterion: 6
+CDP ou Cisco Discovery Protocol
+
+En observant les résultats sur les lignes nommées CDP/VTP/DTP/PAgD/UDLD. Le CDP est utilisé par les switch pour vérifier l'état du réseaux ; quel port est utilisé pour un switch ou pour un pc ? Il enregistre les données et les actualise plusieurs fois.
+STP
+
+En reprennant la commande show spanning-tree on peut établir quel est le root bridge et quel est le port désactivé
+IOU3#sh spanning-tree
+
+VLAN0001
+Spanning tree enabled protocol rstp
+Root ID    Priority    32769
+            Address     aabb.cc00.0100
+            Cost        100
+            Port        2 (Ethernet0/1)
+            Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+Bridge ID  Priority    32769  (priority 32768 sys-id-ext 1)
+            Address     aabb.cc00.0300
+            Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+            Aging Time  300 sec
+
+Interface           Role Sts Cost      Prio.Nbr Type
+------------------- ---- --- --------- -------- --------------------------------
+Et0/0               Desg FWD 100       128.1    Shr
+Et0/1               Root FWD 100       128.2    Shr                 --->>> Voici le root bridge
+Et0/2               Altn BLK 100       128.3    Shr                 --->>> Voici le port fermé
+Et0/3               Desg FWD 100       128.4    Shr
+Et1/0               Desg FWD 100       128.5    Shr
+Et1/1               Desg FWD 100       128.6    Shr
+Et1/2               Desg FWD 100       128.7    Shr
+Et1/3               Desg FWD 100       128.8    Shr
+Et2/0               Desg FWD 100       128.9    Shr
+--More--
+En compilant la priorité pour chaque port, l'adresse mac et on sait comment Spanning Tree Protocol s'est déployé
+                         +-----+
+                         | PC2 |
+                         +--+--+
+                            |
+                         FWD|
+                    FWD +---+---+FWD
+                    +---+  SW2  +----+
+                    |   +-------+    |
+                    |                |
+                FWD |                |BLK
++-----+     FWD +---+---+        +---+---+             +-----+
+| PC1 +---------+  SW1  +--------+  SW3  +-------------+ PC3 |
++-----+         +-------+    FWD +-------+ FWD         +-----+
+                root bridge
+Ici, nous pouvons déduire qu'en théorie, quand le PC3 essaie de ping le PC2 le SW3 ne doit pas être capable de passer par son port e0/2.
+
+Confirmation des informations STP
+
+En pinguant le PC3 au PC2, vérifions d'abord s'il ne passe bien pas par le port e0/2. On voit les requêtes ARP venant du PC3 au SW3 demandant 'Who is 10.2.2.2 ?' et on voit aussi l'abandon de passé par le port e0/2.
+Les demandes ARP passent du SW3 au SW1 et du SW1 au SW2, ainsi ignorant le port e0/2.
+Schéma d'un trajet d'une requête ARP
+
+Partant du PC3 au PC1 :
+                         +-----+
+                         | PC2 |
+                         +--+--+
+                            |
+                            |
+                            |
+                        +---+---+
+                   +----+  SW2  +----+
+                   |    +-------+    |
+                   |                 |  
+                   |                 |
+                   |                 |  
+                   |                 |
++-----+        +---+---+         +---+---+        +-----+
+| PC1 +--------+  SW1  +---------+  SW3  +--------+ PC3 |
++-----+        +-------+         +-------+        +-----+
+départ  >--------->------------------>--------->  arrivée
+de la             |                  |
+requête         PC1 ask         SW3 says 
+                to SW1 who      "address MAC"
+                is 10.2.2.3?
+Reconfigurer le STP
+
+Go IOU 2, rentrons :
+
+IOU2#conf t
+Enter configuration commands, one per line.  End with CNTL/Z.
+IOU2(config)#spanning-tree vlan 1-10 root pri
+IOU2#sh spanning-tree roo
+
+                                        Root    Hello Max Fwd
+Vlan                   Root ID          Cost    Time  Age Dly  Root Port
+---------------- -------------------- --------- ----- --- ---  ------------
+VLAN0001         24577 aabb.cc00.0200         0    2   20  15
+Du coup, ça a changé le STP et a élu un nouveau root bridge et un nouveau port fermé.
+
+IOU3#sh spanning-tree
+
+VLAN0001
+  Spanning tree enabled protocol rstp
+  Root ID    Priority    24577              <==== priorité diminuez 
+             Address     aabb.cc00.0200
+             Cost        100
+             Port        3 (Ethernet0/2)
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+  Bridge ID  Priority    32769  (priority 32768 sys-id-ext 1)
+             Address     aabb.cc00.0300
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+             Aging Time  300 sec
+
+Interface           Role Sts Cost      Prio.Nbr Type
+------------------- ---- --- --------- -------- --------------------------------
+Et0/0               Desg FWD 100       128.1    Shr
+Et0/1               Altn BLK 100       128.2    Shr     <====== nouveau port fermé
+Et0/2               Root FWD 100       128.3    Shr
+Et0/3               Desg FWD 100       128.4    Shr
+Et1/0               Desg FWD 100       128.5    Shr
+Et1/1               Desg FWD 100       128.6    Shr
+Et1/2               Desg FWD 100       128.7    Shr
+Et1/3               Desg FWD 100       128.8    Shr
+Et2/0               Desg FWD 100       128.9    Shr
+III. Isolation
+1. Simple (mode access)
+Topologie
+
++-----+        +-------+        +-----+
+| PC4 +--------+  SW4  +--------+ PC5 |
++-----+      10+-------+20      +-----+
+                 20|
+                   |
+                +--+--+
+                | PC6 |
+                +-----+
+PC4 = 10.2.10.1/24 -- VLAN 10 PC5 = 10.2.20.2/24 -- VLAN 20 PC6 = 10.2.20.3/24 -- VLAN 20
+
+PC4> sh ip
+
+NAME        : PC4[1]
+IP/MASK     : 10.2.10.1/24
+GATEWAY     : 0.0.0.0
+DNS         :
+MAC         : 00:50:79:66:68:03
+LPORT       : 10028
+RHOST:PORT  : 127.0.0.1:10029
+MTU:        : 1500
+
+PC4> ping 10.2.20.2
+No gateway found
+IOU4#sh vlan
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Et0/0, Et1/0, Et1/1, Et1/2
+                                                Et1/3, Et2/0, Et2/1, Et2/2
+                                                Et2/3, Et3/0, Et3/1, Et3/2
+                                                Et3/3
+10   admin-network                    active    Et0/1
+20   client-network                   active    Et0/2, Et0/3
+Et PC4 ne ping pas PC5 ou PC6 comme prévue, alors que les deux autres peuvent se ping entre eux.
+
+2. Avec trunk
+Topologie
+
++-----+        +-------+        +-------+        +-----+
+| PC1 +--------+  SW1  +--------+  SW2  +--------+ PC4 |
++-----+      10+-------+        +-------+20      +-----+
+                 20|              10|
+                   |                |
+                +--+--+          +--+--+
+                | PC2 |          | PC3 |
+                +-----+          +-----+
+Une fois la configuration terminée et le ping envoyé, on remarque que le tag pèse 4 bits et que sa longueur augmente du coup entre les deux switch. (voir wireshark_trunk_textplain.txt)
+
+IV. Need perfs
+Même topologie et pland d'adressage
+
+Sans utilisation de LACP :
+
+IOU5#sh interfaces
+Ethernet0/0 is up, line protocol is up (connected)
+  Hardware is AmdP2, address is aabb.cc00.0500 (bia aabb.cc00.0500)
+  MTU 1500 bytes, BW 10000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+On notera ici BW 10000 Kbit/sec Et avec l'utilidztion de LACP :
+
+IOU5#sh interfaces po1
+Port-channel1 is up, line protocol is up (connected)
+  Hardware is EtherChannel, address is aabb.cc00.0501 (bia aabb.cc00.0501)
+  MTU 1500 bytes, BW 20000 Kbit/sec, DLY 1000 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+Et on obtient BW 20000 Kbit/sec, on a donc douclé la bande passante en doublant les ports et connections.
