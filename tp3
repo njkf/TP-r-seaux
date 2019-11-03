@@ -1,0 +1,90 @@
+# TP3 : Routage INTER-VLAN + mise en situation
+
+## I. *Router-on-a-stick*
+
+J'ai configuré le routeur pour chaque interface : 0/0.10, 0/0.20, 0/0.30, 0/0.40 :
+```
+R1#sh vlans
+
+Virtual LAN ID:  1 (IEEE 802.1Q Encapsulation)
+
+   vLAN Trunk Interface:   FastEthernet0/0
+
+ This is configured as native Vlan for the following interface(s) :
+FastEthernet0/0
+
+   Protocols Configured:   Address:              Received:        Transmitted:
+        Other                                           0                   2
+
+   3 packets, 180 bytes input
+   2 packets, 372 bytes output
+
+Virtual LAN ID:  10 (IEEE 802.1Q Encapsulation)
+
+   vLAN Trunk Interface:   FastEthernet0/0.10
+
+   Protocols Configured:   Address:              Received:        Transmitted:
+           IP              10.3.10.254                  0                   0
+        Other                                           0                   3
+
+   0 packets, 0 bytes input
+   3 packets, 457 bytes output
+
+Virtual LAN ID:  20 (IEEE 802.1Q Encapsulation)
+
+   vLAN Trunk Interface:   FastEthernet0/0.20
+
+   Protocols Configured:   Address:              Received:        Transmitted:
+           IP              10.3.20.154                  0                   0
+        Other                                           0                   3
+
+   0 packets, 0 bytes input
+   3 packets, 457 bytes output
+
+Virtual LAN ID:  30 (IEEE 802.1Q Encapsulation)
+
+   vLAN Trunk Interface:   FastEthernet0/0.30
+
+   Protocols Configured:   Address:              Received:        Transmitted:
+           IP              10.3.30.254                  0                   0
+        Other                                           0                   3
+
+   0 packets, 0 bytes input
+   3 packets, 457 bytes output
+
+Virtual LAN ID:  40 (IEEE 802.1Q Encapsulation)
+
+   vLAN Trunk Interface:   FastEthernet0/0.40
+
+   Protocols Configured:   Address:              Received:        Transmitted:
+           IP              10.3.40.254                  0                   0
+        Other                                           0                   3
+
+   0 packets, 0 bytes input
+   3 packets, 457 bytes output
+```
+PC1 affiche : 
+```
+PC1> ping 10.3.10.254
+10.3.10.254 icmp_seq=1 timeout
+10.3.10.254 icmp_seq=2 timeout
+10.3.10.254 icmp_seq=3 timeout
+10.3.10.254 icmp_seq=4 timeout
+10.3.10.254 icmp_seq=5 timeout
+```
+
+## Partie deux
+
+plan d'adressage :
+
+u     users       10.3.10.0      vlan 10
+a     admin       10.3.20.0      vlan 20
+s     stagiaire   10.3.30.0      vlan 30
+srv   server      10.3.40.0      vlan 40
+p     printers    10.3.50.0      vlan 50
+
+MODE ACCESS :
+conf t
+interface ethernet 
+switchport mode access
+switchport access vlan
